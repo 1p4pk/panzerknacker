@@ -55,7 +55,7 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 	////////////////////
 	
 	@Data @NoArgsConstructor @AllArgsConstructor
-	public static class LargeMessage<T> implements Serializable {
+	public static class LargeMessage<T> extends Output implements Serializable {
 		private static final long serialVersionUID = 2940665245810221108L;
 		private T message;
 		private ActorRef receiver;
@@ -96,28 +96,40 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		ActorRef receiver = message.getReceiver();
 		ActorSelection receiverProxy = this.context().actorSelection(receiver.path().child(DEFAULT_NAME));
 		
-		
+		try {
 		Kryo kryo = new Kryo();
-		Output out = new Output(new ByteArrayOutputStream());
-        kryo.writeObject(out, message);
-        
-        ByteArrayInputStream bis = new ByteArrayInputStream(out.toBytes());
-        Input in = new Input(bis);
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		Output out = new Output(bos);
+        kryo.writeClassAndObject(out, message.getMessage());
         out.close();
+        bos.close();
         
-        Source<ByteString, CompletionStage<IOResult>> source = StreamConverters.fromInputStream(() -> in, CHUNK_SIZE);
+        ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+        Input in = new Input(bis);
         in.close();
-        @SuppressWarnings("unchecked")
+        bis.close();
+
+        Source<ByteString, CompletionStage<IOResult>> source = StreamConverters.fromInputStream(() -> in, CHUNK_SIZE);
 		SourceRef<ByteString> sourceRef = source.runWith(StreamRefs.sourceRef(), mat);
         
         receiverProxy.tell(new InitMessage(sourceRef, this.sender(), message.getReceiver()), this.self());
-        
+		} catch(Exception e) {
+			this.log().error(e.getMessage());
+		}
 	}
 	
 	private void handle(InitMessage message) {
 		// Reassemble the message content, deserialize it and/or load the content from some local location before forwarding its content.
-		message.getByteStream().getSource().runWith(
-				Sink.foreach(bytes -> this.log().info(bytes.toString())),
+		CompletionStage<ByteString> byteStr = message.getByteStream().getSource().runWith(
+				Sink.fold(ByteString.empty(), (byteString, next) -> byteString.concat(next)),
 				mat);
+		byteStr.thenAcceptAsync(str -> {
+			Kryo kryo = new Kryo();
+			ByteArrayInputStream bis = new ByteArrayInputStream(str.toArray());
+			Input in = new Input(bis);
+
+			LargeMessage largeMessage = new LargeMessage(kryo.readClassAndObject(in), message.getReceiver());
+			message.getReceiver().tell(largeMessage, message.getSender());
+		});
 	}
 }
