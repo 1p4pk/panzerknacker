@@ -115,9 +115,11 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		final CompletionStage<ByteString> byteStr = message.getByteStream().getSource().runWith(
 				Sink.fold(ByteString.empty(), (byteString, next) -> byteString.concat(next)), mat);
 		byteStr.whenCompleteAsync((str, o) -> handleCompleteMessage(str, message.getReceiver(), message.getSender()));
+		this.log().info("LargeMessage streaming started");
 	}
 
 	private void handleCompleteMessage(ByteString byteString, ActorRef receiver, ActorRef sender) {
+		this.log().info("LargeMessage streaming finished");
 		try {
 		Kryo kryo = new Kryo();
 		ByteArrayInputStream bis = new ByteArrayInputStream(byteString.toArray());
@@ -126,6 +128,7 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		bis.close();
 
 		receiver.tell(kryo.readClassAndObject(in), sender);
+		this.log().info("LargeMessage sent successfully");
 		} catch (IOException e) {
 			this.log().error(e.getMessage());
 		}

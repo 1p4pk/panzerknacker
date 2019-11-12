@@ -54,6 +54,7 @@ public class LargeMessageProxyTest {
 				"akka.remote.artery.canonical.hostname = \"" + c.getHost() + "\"\n" +
 				"akka.remote.artery.canonical.port = " + c.getPort() + "\n" +
 				"akka.cluster.roles = [" + MasterSystem.MASTER_ROLE + "]\n" +
+				"akka.coordinated-shutdown.run-by-actor-system-terminate = off\n" +
 				"akka.cluster.seed-nodes = [\"akka://" + c.getActorSystemName() + "@" + c.getMasterHost() + ":" + c.getMasterPort() + "\"]")
 			.withFallback(ConfigFactory.load("application"));
 		
