@@ -2,28 +2,19 @@ package de.hpi.ddm.actors;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 
-import java.util.Arrays;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.concurrent.CompletionStage;
-
-import org.apache.commons.lang3.Range;
 
 import com.esotericsoftware.kryo.Kryo;
 import com.esotericsoftware.kryo.io.Input;
 import com.esotericsoftware.kryo.io.Output;
 
-import java.io.IOException;
 
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.ActorSelection;
 import akka.actor.Props;
-import akka.NotUsed;
 import akka.util.ByteString;
 import akka.stream.IOResult;
 import akka.stream.Materializer;
@@ -119,17 +110,16 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 	}
 	
 	private void handle(InitMessage message) {
-		// Reassemble the message content, deserialize it and/or load the content from some local location before forwarding its content.
-		CompletionStage<ByteString> byteStr = message.getByteStream().getSource().runWith(
-				Sink.fold(ByteString.empty(), (byteString, next) -> byteString.concat(next)),
-				mat);
-		byteStr.thenAcceptAsync(str -> {
-			Kryo kryo = new Kryo();
-			ByteArrayInputStream bis = new ByteArrayInputStream(str.toArray());
-			Input in = new Input(bis);
 
-			LargeMessage largeMessage = new LargeMessage(kryo.readClassAndObject(in), message.getReceiver());
-			message.getReceiver().tell(largeMessage, message.getSender());
-		});
+		final CompletionStage<ByteString> byteStr = message.getByteStream().getSource().runWith(
+				Sink.fold(ByteString.empty(), (byteString, next) -> byteString.concat(next)), mat);
+		byteStr.whenCompleteAsync((str, o) -> handleCompleteMessage(str, message.getReceiver(), message.getSender()));
+	}
+
+	private void handleCompleteMessage(ByteString byteString, ActorRef receiver, ActorRef sender){
+		Kryo kryo = new Kryo();
+		ByteArrayInputStream bis = new ByteArrayInputStream(byteString.toArray());
+		Input in = new Input(bis);
+		receiver.tell(kryo.readClassAndObject(in), sender);
 	}
 }
