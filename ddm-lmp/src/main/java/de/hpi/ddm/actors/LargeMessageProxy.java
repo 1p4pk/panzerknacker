@@ -2,6 +2,7 @@ package de.hpi.ddm.actors;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
 
 import java.util.concurrent.CompletionStage;
@@ -116,10 +117,17 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		byteStr.whenCompleteAsync((str, o) -> handleCompleteMessage(str, message.getReceiver(), message.getSender()));
 	}
 
-	private void handleCompleteMessage(ByteString byteString, ActorRef receiver, ActorRef sender){
+	private void handleCompleteMessage(ByteString byteString, ActorRef receiver, ActorRef sender) {
+		try {
 		Kryo kryo = new Kryo();
 		ByteArrayInputStream bis = new ByteArrayInputStream(byteString.toArray());
 		Input in = new Input(bis);
+		in.close();
+		bis.close();
+
 		receiver.tell(kryo.readClassAndObject(in), sender);
+		} catch (IOException e) {
+			this.log().error(e.getMessage());
+		}
 	}
 }
