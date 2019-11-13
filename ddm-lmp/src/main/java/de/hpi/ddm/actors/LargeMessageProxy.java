@@ -53,8 +53,9 @@ public class LargeMessageProxy extends AbstractLoggingActor {
 		private ActorRef receiver;
 	}
 
+	public interface JsonSerializable {}
 	@Data @NoArgsConstructor @AllArgsConstructor
-	public static class InitMessage implements Serializable {
+	public static class InitMessage implements JsonSerializable {
 		private static final long serialVersionUID = 4057807743872319842L;
 		private SourceRef<ByteString> byteStream;
 		private ActorRef sender;
