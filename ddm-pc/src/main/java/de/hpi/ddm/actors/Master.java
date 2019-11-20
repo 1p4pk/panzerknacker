@@ -61,7 +61,11 @@ public class Master extends AbstractLoggingActor {
 	private final List<ActorRef> workers;
 
 	private long startTime;
-	
+
+	private boolean isInit = false;
+	private int passwordLength;
+	private char[] alphabet;
+	private int amountHints;
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -109,7 +113,15 @@ public class Master extends AbstractLoggingActor {
 		
 		for (String[] line : message.getLines())
 			System.out.println(Arrays.toString(line));
-		
+
+		if(!this.isInit){
+			this.isInit = true;
+			String[] firstRow = message.getLines().get(0);
+			this.passwordLength = Integer.parseInt(firstRow[3]);
+			this.alphabet = firstRow[2].toCharArray();
+			this.amountHints = firstRow.length - 5;
+		}
+
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
 		this.reader.tell(new Reader.ReadMessage(), this.self());
 	}
