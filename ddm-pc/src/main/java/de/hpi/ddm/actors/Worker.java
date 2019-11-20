@@ -1,5 +1,6 @@
 package de.hpi.ddm.actors;
 
+import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -16,6 +17,9 @@ import akka.cluster.ClusterEvent.MemberUp;
 import akka.cluster.Member;
 import akka.cluster.MemberStatus;
 import de.hpi.ddm.MasterSystem;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 public class Worker extends AbstractLoggingActor {
 
@@ -37,12 +41,24 @@ public class Worker extends AbstractLoggingActor {
 	// Actor Messages //
 	////////////////////
 
+	@Data @NoArgsConstructor @AllArgsConstructor
+	public static class SetupMessage implements Serializable {
+		private static final long serialVersionUID = -50375816448627600L;
+		private char resultChar;
+		private char[] alphabet;
+		private int amountHints;
+	}
+
 	/////////////////
 	// Actor State //
 	/////////////////
 
 	private Member masterSystem;
 	private final Cluster cluster;
+
+	private char resultChar;
+	private char[] alphabet;
+	private int amountHints;
 	
 	/////////////////////
 	// Actor Lifecycle //
@@ -70,6 +86,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(CurrentClusterState.class, this::handle)
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
+				.match(SetupMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -98,6 +115,12 @@ public class Worker extends AbstractLoggingActor {
 	private void handle(MemberRemoved message) {
 		if (this.masterSystem.equals(message.member()))
 			this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
+	}
+
+	private void handle(SetupMessage message) {
+		this.resultChar = message.getResultChar();
+		this.alphabet = message.getAlphabet();
+		this.amountHints = message.getAmountHints();
 	}
 	
 	private String hash(String line) {

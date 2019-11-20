@@ -1,15 +1,9 @@
 package de.hpi.ddm.actors;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.*;
 
-import akka.actor.AbstractLoggingActor;
-import akka.actor.ActorRef;
-import akka.actor.PoisonPill;
-import akka.actor.Props;
-import akka.actor.Terminated;
+import akka.actor.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -30,6 +24,8 @@ public class Master extends AbstractLoggingActor {
 		this.reader = reader;
 		this.collector = collector;
 		this.workers = new ArrayList<>();
+		this.busyWorkers = new HashMap<>();
+		this.unassignedWork = new ArrayList<>();
 	}
 
 	////////////////////
@@ -59,6 +55,8 @@ public class Master extends AbstractLoggingActor {
 	private final ActorRef reader;
 	private final ActorRef collector;
 	private final List<ActorRef> workers;
+	private final Map<ActorRef, Worker.SetupMessage> busyWorkers;
+	private final List<Worker.SetupMessage> unassignedWork;
 
 	private long startTime;
 
@@ -120,6 +118,17 @@ public class Master extends AbstractLoggingActor {
 			this.passwordLength = Integer.parseInt(firstRow[3]);
 			this.alphabet = firstRow[2].toCharArray();
 			this.amountHints = firstRow.length - 5;
+			for(char varChar : alphabet){
+				unassignedWork.add(new Worker.SetupMessage(varChar, this.alphabet, this.amountHints));
+			}
+
+			for(ActorRef worker : this.workers){
+				if(this.unassignedWork.size() > 0){
+					Worker.SetupMessage workSetup = this.unassignedWork.remove(this.unassignedWork.size() - 1);
+					worker.tell(workSetup, this.self());
+					this.busyWorkers.put(worker, workSetup);
+				}
+			}
 		}
 
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
@@ -143,8 +152,14 @@ public class Master extends AbstractLoggingActor {
 
 	protected void handle(RegistrationMessage message) {
 		this.context().watch(this.sender());
-		this.workers.add(this.sender());
-//		this.log().info("Registered {}", this.sender());
+		if(this.unassignedWork.size() > 0){
+			Worker.SetupMessage workSetup = this.unassignedWork.remove(this.unassignedWork.size() - 1);
+			this.sender().tell(workSetup, this.self());
+			this.busyWorkers.put(this.sender(), workSetup);
+		} else {
+			this.workers.add(this.sender());
+		}
+		//		this.log().info("Registered {}", this.sender());
 	}
 	
 	protected void handle(Terminated message) {
