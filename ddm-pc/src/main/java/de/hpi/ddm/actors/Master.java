@@ -188,10 +188,15 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	protected void handle(PullDataMessage message) {
-		if(this.workerBatchMap.get(this.sender()) < this.currentBatchId){
+		if (this.workerBatchMap.get(this.sender()) < this.currentBatchId) {
 			Map<String, String> hintMessageData = this.hashedHints;
 			this.workerBatchMap.put(this.sender(), this.currentBatchId);
 			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
+		} else if (!this.unassignedHintChars.isEmpty()) {
+			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
+			this.sender().tell(workSetup, this.self());
+			this.charWorkers.put(this.sender(), workSetup);
+			this.workerBatchMap.put(this.sender(), 0);
 		} else {
 			this.idleHintCrackers.add(this.sender());
 		}

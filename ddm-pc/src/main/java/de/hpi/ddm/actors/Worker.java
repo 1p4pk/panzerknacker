@@ -17,7 +17,6 @@ import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.ArrayUtils;
 
 import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -158,9 +157,10 @@ public class Worker extends AbstractLoggingActor {
 			if (curentHints.containsKey(hash)){
 				String passwordId = curentHints.get(hash);
 				this.sender().tell(new Master.HintResultMessage(passwordId, resultChar), this.self());
-				this.log().info("Cracked a hint.");
+				this.log().info("Cracked a hint for char " + resultChar);
 			}
 		}
+		this.sender().tell(new Master.PullDataMessage(), this.self());
 	}
 
 	private void handle(PasswordDataMessage message) {
