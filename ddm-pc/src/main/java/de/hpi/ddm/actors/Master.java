@@ -30,7 +30,9 @@ public class Master extends AbstractLoggingActor {
 		this.idleHintCrackers = new ArrayList<>();
 		this.hintResults = new HashMap<>();
 		this.hashedPasswords = new HashMap<>();
+		this.resultPasswords = new HashMap<>();
 		this.currentBatchId = 0;
+		this.lastPasswordId = 0;
 		this.workerBatchMap = new HashMap<>();
 	}
 
@@ -93,6 +95,8 @@ public class Master extends AbstractLoggingActor {
 
 	private Map<String, String> hashedHints;
 	private Map<String, String> hashedPasswords;
+	private Map<String, String> resultPasswords;
+	private int lastPasswordId;
 	private int currentBatchId;
 	private Map<ActorRef, Integer> workerBatchMap;
 
@@ -231,14 +235,29 @@ public class Master extends AbstractLoggingActor {
 
     protected void handle(PasswordResultMessage message) {
 		this.workers.add(this.sender());
-		this.log().info("PasswordResultMessage");
-		this.log().info(message.getPw());
-        // TODO: Receive cracked pw
-		// TODO: Create data structure for cracked passwords
-		// TODO: Send sorted passwords to collector
+		if(Integer.toString(this.lastPasswordId + 1) == message.getId()){
+            this.collector.tell(new Collector.CollectMessage(message.getPw()));
+            this.lastPasswordId++;
+            if(!this.resultPasswords.isEmpty()){
+                this.checkToSendPasswords();
+            }
+        } else {
+            this.resultPasswords.put(message.getId(), message.getPw());
+        }
     }
 
-	protected void terminate() {
+    private void checkToSendPasswords() {
+	    String id = Integer.toString(this.lastPasswordId + 1);
+        if(this.resultPasswords.containsKey(id)){
+            this.collector.tell(new Collector.CollectMessage(this.resultPasswords.remove(id)), this.self());
+            this.lastPasswordId++;
+            if(!this.resultPasswords.isEmpty()){
+                this.checkToSendPasswords();
+            }
+        }
+    }
+
+    protected void terminate() {
 		this.reader.tell(PoisonPill.getInstance(), ActorRef.noSender());
 		this.collector.tell(PoisonPill.getInstance(), ActorRef.noSender());
 		
