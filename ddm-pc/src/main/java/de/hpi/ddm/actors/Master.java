@@ -1,12 +1,12 @@
 package de.hpi.ddm.actors;
 
-import java.io.Serializable;
-import java.util.*;
-
 import akka.actor.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.io.Serializable;
+import java.util.*;
 
 public class Master extends AbstractLoggingActor {
 
@@ -63,6 +63,13 @@ public class Master extends AbstractLoggingActor {
 		private String id;
 		private char nonContainedChar;
 	}
+
+    @Data @NoArgsConstructor @AllArgsConstructor
+    public static class PasswordResultMessage implements Serializable {
+        private static final long serialVersionUID = 3303382392345723997L;
+        private String id;
+        private String pw;
+    }
 	/////////////////
 	// Actor State //
 	/////////////////
@@ -70,8 +77,8 @@ public class Master extends AbstractLoggingActor {
 	private final ActorRef reader;
 	private final ActorRef collector;
 	private final List<ActorRef> workers;
-	private final Map<ActorRef, Worker.SetupMessage> charWorkers;
-	private final List<Worker.SetupMessage> unassignedHintChars;
+    private final Map<ActorRef, Worker.HintSetupMessage> charWorkers;
+    private final List<Worker.HintSetupMessage> unassignedHintChars;
 	private final List<ActorRef> idleHintCrackers;
 
 
@@ -141,12 +148,12 @@ public class Master extends AbstractLoggingActor {
 			this.alphabet = firstRow[2].toCharArray();
 			this.amountHints = firstRow.length - 5;
 			for(char varChar : alphabet){
-				unassignedHintChars.add(new Worker.SetupMessage(varChar, this.alphabet, this.amountHints));
+                unassignedHintChars.add(new Worker.HintSetupMessage(varChar, this.alphabet, this.amountHints));
 			}
 
 			for(ActorRef worker : this.workers){
 				if(!this.unassignedHintChars.isEmpty()){
-					Worker.SetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
+                    Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 					worker.tell(workSetup, this.self());
 					this.charWorkers.put(worker, workSetup);
 					this.workerBatchMap.put(worker, 0);
@@ -190,16 +197,25 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	protected void handle(HintResultMessage message){
-		// TODO: Start cracking pw
+
 		if(this.hintResults.containsKey(message.getId())){
 			char[] charArray = this.hintResults.get(message.getId());
 			char[] updateArray = Arrays.copyOf(charArray, charArray.length+1);
 			updateArray[charArray.length] = message.getNonContainedChar();
 			this.hintResults.put(message.getId(), updateArray);
+            // TODO: Start cracking pw
+            if (this.amountHints == updateArray.length) {
+                // TODO: Notify pw-cracker worker
+                // TODO: Delete hints from hint results
+            }
 		} else {
 			this.hintResults.put(message.getId(), new char[]{message.getNonContainedChar()});
 		}
 	}
+
+    protected void handle(PasswordResultMessage message) {
+        // TODO: Receive cracked pw
+    }
 
 	protected void terminate() {
 		this.reader.tell(PoisonPill.getInstance(), ActorRef.noSender());
@@ -219,7 +235,7 @@ public class Master extends AbstractLoggingActor {
 	protected void handle(RegistrationMessage message) {
 		this.context().watch(this.sender());
 		if(!this.unassignedHintChars.isEmpty()){
-			Worker.SetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
+            Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
 			this.workerBatchMap.put(this.sender(), 0);

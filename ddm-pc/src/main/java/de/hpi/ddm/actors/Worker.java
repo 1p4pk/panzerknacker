@@ -1,14 +1,5 @@
 package de.hpi.ddm.actors;
 
-import java.io.Serializable;
-import java.io.UnsupportedEncodingException;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.PoisonPill;
@@ -24,6 +15,15 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.ArrayUtils;
+
+import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class Worker extends AbstractLoggingActor {
 
@@ -46,7 +46,7 @@ public class Worker extends AbstractLoggingActor {
 	////////////////////
 
 	@Data @NoArgsConstructor @AllArgsConstructor
-	public static class SetupMessage implements Serializable {
+	public static class HintSetupMessage implements Serializable {
 		private static final long serialVersionUID = -50375816448627600L;
 		private char resultChar;
 		private char[] alphabet;
@@ -59,6 +59,15 @@ public class Worker extends AbstractLoggingActor {
 		private Map<String, String> hintData;
 	}
 
+	@Data
+	@NoArgsConstructor
+	@AllArgsConstructor
+	public static class PasswordDataMessage implements Serializable {
+		private static final long serialVersionUID = -50375819032223600L;
+		private String id;
+		private char[] passwordAlphabet;
+		private int passwordLength;
+	}
 	/////////////////
 	// Actor State //
 	/////////////////
@@ -66,6 +75,7 @@ public class Worker extends AbstractLoggingActor {
 	private Member masterSystem;
 	private final Cluster cluster;
 
+	// Hint variables
 	private char resultChar;
 	private char[] alphabet;
 	private int amountHints;
@@ -97,7 +107,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(CurrentClusterState.class, this::handle)
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
-				.match(SetupMessage.class, this::handle)
+				.match(HintSetupMessage.class, this::handle)
 				.match(HintDataMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
@@ -129,7 +139,7 @@ public class Worker extends AbstractLoggingActor {
 			this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
 	}
 
-	private void handle(SetupMessage message) {
+	private void handle(HintSetupMessage message) {
 		this.resultChar = message.getResultChar();
 		this.alphabet = message.getAlphabet();
 		this.amountHints = message.getAmountHints();
