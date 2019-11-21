@@ -34,7 +34,7 @@ public class Master extends AbstractLoggingActor {
 		this.resultPasswords = new HashMap<>();
 		this.currentBatchId = 0;
 		this.lastPasswordId = 0;
-		this.workerBatchMap = new HashMap<>();
+		this.charBatchMap = new HashMap<>();
 	}
 
 	////////////////////
@@ -100,7 +100,7 @@ public class Master extends AbstractLoggingActor {
 	private Map<String, String> resultPasswords;
 	private int lastPasswordId;
 	private int currentBatchId;
-	private Map<ActorRef, Integer> workerBatchMap;
+	private Map<Character, Integer> charBatchMap;
 
 	private Map<String, char[]> remainingAlphabetForId;
 	/////////////////////
@@ -166,7 +166,7 @@ public class Master extends AbstractLoggingActor {
                     Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 					worker.tell(workSetup, this.self());
 					this.charWorkers.put(worker, workSetup);
-					this.workerBatchMap.put(worker, 0);
+					this.charBatchMap.put(workSetup.getResultChar(), 0);
 				}
 			}
 		}
@@ -183,37 +183,35 @@ public class Master extends AbstractLoggingActor {
 
 		for(ActorRef charWorker : this.idleHintCrackers){
 			charWorker.tell(new Worker.HintDataMessage(this.hashedHints), this.self());
-			this.workerBatchMap.put(charWorker, this.currentBatchId);
+			this.charBatchMap.put(this.charWorkers.get(charWorker).getResultChar(), this.currentBatchId);
 		}
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
 	}
 
 	protected void handle(PullDataMessage message) {
-		if (this.workerBatchMap.get(this.sender()) < this.currentBatchId) {
+		char currentChar = this.charWorkers.get(this.sender()).getResultChar();
+		if (this.charBatchMap.get(currentChar) < this.currentBatchId) {
 			Map<String, String> hintMessageData = this.hashedHints;
-			this.workerBatchMap.put(this.sender(), this.currentBatchId);
+			this.charBatchMap.put(currentChar, this.currentBatchId);
 			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
 		} else if (!this.unassignedHintChars.isEmpty()) {
 			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
-			this.workerBatchMap.put(this.sender(), 0);
+			this.charBatchMap.put(currentChar, this.currentBatchId - 1);
+			this.unassignedHintChars.put(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
 		} else {
 			this.idleHintCrackers.add(this.sender());
 		}
-
-		if (this.unassignedHintChars.isEmpty()){
-			boolean readNewBatch = true;
-			for(Integer  batchId : this.workerBatchMap.values()) {
-				if (batchId < this.currentBatchId){
-					readNewBatch=false;
-					break;
-				}
+		boolean batchFinished = true;
+		for (int id : this.charBatchMap.values()) {
+			if (id < this.currentBatchId) {
+				batchFinished = false;
+				break;
 			}
-			if (readNewBatch) {this.reader.tell(new Reader.ReadMessage(), this.self());}
 		}
-
+		if (batchFinished) { this.reader.tell(new Reader.ReadMessage(), this.self()); }
 	}
 
 	protected void handle(HintResultMessage message){
@@ -287,7 +285,7 @@ public class Master extends AbstractLoggingActor {
             Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
-			this.workerBatchMap.put(this.sender(), 0);
+			this.charBatchMap.put(workSetup.getResultChar(), 0);
 		} else {
 			this.workers.add(this.sender());
 		}
