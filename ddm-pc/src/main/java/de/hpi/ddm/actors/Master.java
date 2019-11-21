@@ -55,7 +55,7 @@ public class Master extends AbstractLoggingActor {
 		private static final long serialVersionUID = 3303382301659723997L;
 	}
 
-	@Data
+	@Data @NoArgsConstructor @AllArgsConstructor
 	public static class HintResultMessage implements Serializable {
 		private static final long serialVersionUID = 3303382394659723997L;
 		private String id;
@@ -164,6 +164,7 @@ public class Master extends AbstractLoggingActor {
 		if(this.pullMessages == this.charWorkers.size()){
 			this.reader.tell(new Reader.ReadMessage(), this.self());
 			this.pullMessages = 0;
+			// TODO: Start cracking pw
 		}
 	}
 
@@ -176,7 +177,6 @@ public class Master extends AbstractLoggingActor {
 		} else {
 			this.hintResults.put(message.getId(), new char[]{message.getNonContainedChar()});
 		}
-
 	}
 
 	protected void terminate() {
