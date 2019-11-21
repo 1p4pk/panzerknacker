@@ -26,6 +26,7 @@ public class Master extends AbstractLoggingActor {
 		this.workers = new ArrayList<>();
 		this.charWorkers = new HashMap<>();
 		this.unassignedWork = new ArrayList<>();
+		this.hintResults = new HashMap<>();
 		this.pullMessages = 0;
 	}
 
@@ -77,8 +78,11 @@ public class Master extends AbstractLoggingActor {
 	private int passwordLength;
 	private char[] alphabet;
 	private int amountHints;
+
 	private List<String[]> currentBatch;
 	private int pullMessages;
+
+	private Map<String, char[]> hintResults;
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -98,6 +102,7 @@ public class Master extends AbstractLoggingActor {
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
 				.match(PullDataMessage.class, this::handle)
+				.match(HintResultMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.match(RegistrationMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
@@ -147,7 +152,7 @@ public class Master extends AbstractLoggingActor {
 		this.currentBatch = message.getLines();
 
 		for(ActorRef charWorker : this.charWorkers.keySet()){
-			charWorker.tell(new Worker.HintDataMessage(this.currentBatch));
+			charWorker.tell(new Worker.HintDataMessage(message.getLines()), this.self());
 		}
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
@@ -160,6 +165,18 @@ public class Master extends AbstractLoggingActor {
 			this.reader.tell(new Reader.ReadMessage(), this.self());
 			this.pullMessages = 0;
 		}
+	}
+
+	protected void handle(HintResultMessage message){
+		if(this.hintResults.containsKey(message.getId())){
+			char[] charArray = this.hintResults.get(message.getId());
+			char[] updateArray = Arrays.copyOf(charArray, charArray.length+1);
+			updateArray[charArray.length] = message.getNonContainedChar();
+			this.hintResults.put(message.getId(), updateArray);
+		} else {
+			this.hintResults.put(message.getId(), new char[]{message.getNonContainedChar()});
+		}
+
 	}
 
 	protected void terminate() {
