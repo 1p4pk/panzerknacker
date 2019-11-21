@@ -151,8 +151,14 @@ public class Master extends AbstractLoggingActor {
 
 		this.currentBatch = message.getLines();
 
+		Map<String, String> hintMessageData = new HashMap<>();
+		for(String[] line : this.currentBatch){
+			for(i=5;i<this.amountHints+5;i++){
+				hintMessageData.put(line[i], line[0]);
+			}
+		}
 		for(ActorRef charWorker : this.charWorkers.keySet()){
-			charWorker.tell(new Worker.HintDataMessage(message.getLines()), this.self());
+			charWorker.tell(new Worker.HintDataMessage(hintMessageData), this.self());
 		}
 		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());

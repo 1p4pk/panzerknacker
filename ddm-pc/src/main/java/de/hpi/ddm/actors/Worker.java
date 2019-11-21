@@ -5,6 +5,7 @@ import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.List;
+import java.util.Map;
 
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
@@ -52,7 +53,7 @@ public class Worker extends AbstractLoggingActor {
 	@Data @NoArgsConstructor @AllArgsConstructor
 	public static class HintDataMessage implements Serializable {
 		private static final long serialVersionUID = -50375816444623600L;
-		private List<String[]> hintData;
+		private Map<String, String> hintData;
 	}
 
 	/////////////////
