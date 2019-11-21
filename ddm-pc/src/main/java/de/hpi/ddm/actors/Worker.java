@@ -137,12 +137,13 @@ public class Worker extends AbstractLoggingActor {
 	}
 
 	private void handle(HintDataMessage message) {
+		this.log().info("Start cracking hints.");
 		this.curentHints = message.getHintData();
 		char[] hintAlphabet = ArrayUtils.removeElement(this.alphabet, this.resultChar);
 		int hintLength = this.alphabet.length - 1;
 		List<String> possibleCleartextHints = new ArrayList<>();
 		this.heapPermutation(hintAlphabet, hintLength, possibleCleartextHints);
-
+		this.log().info("Finished heap permutation");
 //		this.log().info(String.valueOf(this.resultChar));
 //		this.log().info(possibleCleartextHints.get(0));
 //		this.log().info(this.hash(possibleCleartextHints.get(0)));
@@ -154,6 +155,7 @@ public class Worker extends AbstractLoggingActor {
 			if (curentHints.containsKey(hash)){
 				String passwordId = curentHints.get(hash);
 				this.sender().tell(new Master.HintResultMessage(passwordId, resultChar), this.self());
+				this.log().info("Cracked a hint.");
 			}
 		}
 	}
