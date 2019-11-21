@@ -28,7 +28,7 @@ public class Master extends AbstractLoggingActor {
 		this.charWorkers = new HashMap<>();
 		this.unassignedHintChars = new ArrayList<>();
 		this.idleHintCrackers = new ArrayList<>();
-		this.hintResults = new HashMap<>();
+		this.remainingAlphabetForId = new HashMap<>();
 		this.hashedPasswords = new HashMap<>();
 		this.resultPasswords = new HashMap<>();
 		this.currentBatchId = 0;
@@ -100,7 +100,7 @@ public class Master extends AbstractLoggingActor {
 	private int currentBatchId;
 	private Map<ActorRef, Integer> workerBatchMap;
 
-	private Map<String, char[]> hintResults;
+	private Map<String, char[]> remainingAlphabetForId;
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -210,26 +210,18 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	protected void handle(HintResultMessage message){
-
-		if(this.hintResults.containsKey(message.getId())){
-			char[] charArray = this.hintResults.get(message.getId());
-			char[] updateArray = Arrays.copyOf(charArray, charArray.length+1);
-			updateArray[charArray.length] = message.getNonContainedChar();
-            if (this.amountHints == updateArray.length) {
-                ActorRef passwordWorker = this.workers.remove(this.workers.size());
-                char[] passwordAlphabet = this.alphabet;
-                for(char hintChar : updateArray) passwordAlphabet = ArrayUtils.removeElement(passwordAlphabet, hintChar);
-                passwordWorker.tell(new Worker.PasswordDataMessage(message.getId(),
-						this.hashedPasswords.remove(message.getId()),
-                        passwordAlphabet,
-                        this.passwordLength
-                        ), this.self());
-                this.hintResults.remove(message.getId());
-            } else {
-                this.hintResults.put(message.getId(), updateArray);
+		String id = message.getId();
+		char hint = message.getgetNonContainedChar();
+		if(this.remainingAlphabetForId.containsKey(id)){
+			this.remainingAlphabetForId.put(id, ArrayUtils.removeElement(this.remainingAlphabetForId.get(id), hint));
+            if (this.alphabet.length - this.amountHints == this.remainingAlphabetForId.get(id).length) {
+                ActorRef passwordWorker = this.workers.remove(this.workers.size() - 1);
+				char[] passwordAlphabet = this.remainingAlphabetForId.remove(id);
+                passwordWorker.tell(new Worker.PasswordDataMessage(id, this.hashedPasswords.remove(id),
+						passwordAlphabet, this.passwordLength), this.self());
             }
 		} else {
-			this.hintResults.put(message.getId(), new char[]{message.getNonContainedChar()});
+			this.remainingAlphabetForId.put(id, ArrayUtils.removeElement(this.alphabet, hint));
 		}
 	}
 
