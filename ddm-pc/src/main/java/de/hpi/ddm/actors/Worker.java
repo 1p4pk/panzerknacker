@@ -4,6 +4,8 @@ import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +23,7 @@ import de.hpi.ddm.MasterSystem;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.ArrayUtils;
 
 public class Worker extends AbstractLoggingActor {
 
@@ -66,7 +69,8 @@ public class Worker extends AbstractLoggingActor {
 	private char resultChar;
 	private char[] alphabet;
 	private int amountHints;
-	
+	private HashMap<String, String> curentHints;
+
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -94,6 +98,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
 				.match(SetupMessage.class, this::handle)
+				.match(HintDataMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -128,8 +133,31 @@ public class Worker extends AbstractLoggingActor {
 		this.resultChar = message.getResultChar();
 		this.alphabet = message.getAlphabet();
 		this.amountHints = message.getAmountHints();
+		this.sender().tell(new Master.PullDataMessage(), this.self());
 	}
-	
+
+	private void handle(HintDataMessage message) {
+		// Todo update currenthints
+		char[] hintAlphabet = ArrayUtils.removeElement(this.alphabet, this.resultChar);
+		int hintLength = this.alphabet.length - 1;
+		List<String> possibleCleartextHints = new ArrayList<>();
+		this.heapPermutation(hintAlphabet, hintLength, possibleCleartextHints);
+
+//		this.log().info(String.valueOf(this.resultChar));
+//		this.log().info(possibleCleartextHints.get(0));
+//		this.log().info(this.hash(possibleCleartextHints.get(0)));
+//		this.log().info(possibleCleartextHints.get(1));
+//		this.log().info(possibleCleartextHints.get(2));
+
+		for(String cleartextHint: possibleCleartextHints) {
+			String hash = this.hash(cleartextHint);
+			if (curentHints.containsKey(hash)){
+				String passwordId = curentHints.get(hash);
+				this.sender().tell(new Master.HintResultMessage(passwordId, resultChar), this.self());
+			}
+		}
+	}
+
 	private String hash(String line) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -149,13 +177,13 @@ public class Worker extends AbstractLoggingActor {
 	// Generating all permutations of an array using Heap's Algorithm
 	// https://en.wikipedia.org/wiki/Heap's_algorithm
 	// https://www.geeksforgeeks.org/heaps-algorithm-for-generating-permutations/
-	private void heapPermutation(char[] a, int size, int n, List<String> l) {
+	private void heapPermutation(char[] a, int size, List<String> l) {
 		// If size is 1, store the obtained permutation
 		if (size == 1)
 			l.add(new String(a));
 
 		for (int i = 0; i < size; i++) {
-			heapPermutation(a, size - 1, n, l);
+			heapPermutation(a, size - 1, l);
 
 			// If size is odd, swap first and last element
 			if (size % 2 == 1) {
