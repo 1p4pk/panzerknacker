@@ -24,8 +24,9 @@ public class Master extends AbstractLoggingActor {
 		this.reader = reader;
 		this.collector = collector;
 		this.workers = new ArrayList<>();
-		this.busyWorkers = new HashMap<>();
+		this.charWorkers = new HashMap<>();
 		this.unassignedWork = new ArrayList<>();
+		this.pullMessages = 0;
 	}
 
 	////////////////////
@@ -66,8 +67,9 @@ public class Master extends AbstractLoggingActor {
 	private final ActorRef reader;
 	private final ActorRef collector;
 	private final List<ActorRef> workers;
-	private final Map<ActorRef, Worker.SetupMessage> busyWorkers;
+	private final Map<ActorRef, Worker.SetupMessage> charWorkers;
 	private final List<Worker.SetupMessage> unassignedWork;
+
 
 	private long startTime;
 
@@ -75,6 +77,8 @@ public class Master extends AbstractLoggingActor {
 	private int passwordLength;
 	private char[] alphabet;
 	private int amountHints;
+	private List<String[]> currentBatch;
+	private int pullMessages;
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -93,6 +97,7 @@ public class Master extends AbstractLoggingActor {
 		return receiveBuilder()
 				.match(StartMessage.class, this::handle)
 				.match(BatchMessage.class, this::handle)
+				.match(PullDataMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.match(RegistrationMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
@@ -119,9 +124,6 @@ public class Master extends AbstractLoggingActor {
 			this.terminate();
 			return;
 		}
-		
-		for (String[] line : message.getLines())
-			System.out.println(Arrays.toString(line));
 
 		if(!this.isInit){
 			this.isInit = true;
@@ -137,15 +139,29 @@ public class Master extends AbstractLoggingActor {
 				if(this.unassignedWork.size() > 0){
 					Worker.SetupMessage workSetup = this.unassignedWork.remove(this.unassignedWork.size() - 1);
 					worker.tell(workSetup, this.self());
-					this.busyWorkers.put(worker, workSetup);
+					this.charWorkers.put(worker, workSetup);
 				}
 			}
 		}
 
+		this.currentBatch = message.getLines();
+
+		for(ActorRef charWorker : this.charWorkers.keySet()){
+			charWorker.tell(new Worker.HintDataMessage(this.currentBatch));
+		}
+		
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
-		this.reader.tell(new Reader.ReadMessage(), this.self());
+
 	}
-	
+
+	protected void handle(PullDataMessage message) {
+		this.pullMessages++;
+		if(this.pullMessages == this.charWorkers.size()){
+			this.reader.tell(new Reader.ReadMessage(), this.self());
+			this.pullMessages = 0;
+		}
+	}
+
 	protected void terminate() {
 		this.reader.tell(PoisonPill.getInstance(), ActorRef.noSender());
 		this.collector.tell(PoisonPill.getInstance(), ActorRef.noSender());
@@ -166,7 +182,7 @@ public class Master extends AbstractLoggingActor {
 		if(this.unassignedWork.size() > 0){
 			Worker.SetupMessage workSetup = this.unassignedWork.remove(this.unassignedWork.size() - 1);
 			this.sender().tell(workSetup, this.self());
-			this.busyWorkers.put(this.sender(), workSetup);
+			this.charWorkers.put(this.sender(), workSetup);
 		} else {
 			this.workers.add(this.sender());
 		}
