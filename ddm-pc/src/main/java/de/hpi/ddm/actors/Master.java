@@ -28,7 +28,8 @@ public class Master extends AbstractLoggingActor {
 		this.charWorkers = new HashMap<>();
 		this.unassignedHintChars = new ArrayList<>();
 		this.idleHintCrackers = new ArrayList<>();
-		this.remainingAlphabetForId = new HashMap<>();
+        this.unassignedPasswords = new ArrayList<>();
+        this.remainingAlphabetForId = new HashMap<>();
 		this.hashedPasswords = new HashMap<>();
 		this.resultPasswords = new HashMap<>();
 		this.currentBatchId = 0;
@@ -84,6 +85,7 @@ public class Master extends AbstractLoggingActor {
     private final Map<ActorRef, Worker.HintSetupMessage> charWorkers;
     private final List<Worker.HintSetupMessage> unassignedHintChars;
 	private final List<ActorRef> idleHintCrackers;
+    private final List<Worker.PasswordDataMessage> unassignedPasswords;
 
 
 	private long startTime;
@@ -220,10 +222,20 @@ public class Master extends AbstractLoggingActor {
 		if(this.remainingAlphabetForId.containsKey(id)){
 			this.remainingAlphabetForId.put(id, ArrayUtils.removeElement(this.remainingAlphabetForId.get(id), hint));
             if (this.alphabet.length - this.amountHints == this.remainingAlphabetForId.get(id).length) {
-                ActorRef passwordWorker = this.workers.remove(this.workers.size() - 1);
-				char[] passwordAlphabet = this.remainingAlphabetForId.remove(id);
-                passwordWorker.tell(new Worker.PasswordDataMessage(id, this.hashedPasswords.remove(id),
-						passwordAlphabet, this.passwordLength), this.self());
+                char[] passwordAlphabet = this.remainingAlphabetForId.remove(id);
+
+                Worker.PasswordDataMessage unassignedPassword = new Worker.PasswordDataMessage(
+                        id, this.hashedPasswords.remove(id),
+                        passwordAlphabet, this.passwordLength);
+
+                if (!this.unassignedPasswords.isEmpty()) {
+                    ActorRef passwordWorker = this.workers.remove(this.workers.size() - 1);
+                    passwordWorker.tell(unassignedPassword, this.self());
+                } else {
+                    // not enough workers at the moment
+                    this.unassignedPasswords.add(unassignedPassword);
+                }
+
             }
 		} else {
 			this.remainingAlphabetForId.put(id, ArrayUtils.removeElement(this.alphabet, hint));
