@@ -49,6 +49,12 @@ public class Worker extends AbstractLoggingActor {
 		private int amountHints;
 	}
 
+	@Data @NoArgsConstructor @AllArgsConstructor
+	public static class HintDataMessage implements Serializable {
+		private static final long serialVersionUID = -50375816444623600L;
+		private List<String[]> hintData;
+	}
+
 	/////////////////
 	// Actor State //
 	/////////////////

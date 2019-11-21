@@ -47,7 +47,18 @@ public class Master extends AbstractLoggingActor {
 	public static class RegistrationMessage implements Serializable {
 		private static final long serialVersionUID = 3303081601659723997L;
 	}
-	
+
+	@Data
+	public static class PullDataMessage implements Serializable {
+		private static final long serialVersionUID = 3303382301659723997L;
+	}
+
+	@Data
+	public static class HintResultMessage implements Serializable {
+		private static final long serialVersionUID = 3303382394659723997L;
+		private String id;
+		private char nonContainedChar;
+	}
 	/////////////////
 	// Actor State //
 	/////////////////
