@@ -142,12 +142,11 @@ public class Master extends AbstractLoggingActor {
 		// The input file is read in batches for two reasons: /////////////////////////////////////////////////
 		// 1. If we distribute the batches early, we might not need to hold the entire input data in memory. //
 		// 2. If we process the batches early, we can achieve latency hiding. /////////////////////////////////
-		// TODO: Implement the processing of the data for the concrete assignment. ////////////////////////////
 		///////////////////////////////////////////////////////////////////////////////////////////////////////
 		
 		if (message.getLines().isEmpty()) {
 			this.collector.tell(new Collector.PrintMessage(), this.self());
-			this.terminate();
+//			this.terminate();
 			return;
 		}
 
@@ -195,6 +194,10 @@ public class Master extends AbstractLoggingActor {
 			Map<String, String> hintMessageData = this.hashedHints;
 			this.charBatchMap.put(currentChar, this.currentBatchId);
 			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
+		} else if (!this.unassignedPasswords.isEmpty()) {
+			// TODO: remove first element not last (crack passwords in order)
+			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(this.unassignedHintChars.size() - 1);
+			this.sender().tell(unassignedPassword, this.self());
 		} else if (!this.unassignedHintChars.isEmpty()) {
 			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 			this.sender().tell(workSetup, this.self());
@@ -216,7 +219,7 @@ public class Master extends AbstractLoggingActor {
 
 	protected void handle(HintResultMessage message){
 		String id = message.getId();
-		char hint = message.getgetNonContainedChar();
+		char hint = message.getNonContainedChar();
 		if(this.remainingAlphabetForId.containsKey(id)){
 			this.remainingAlphabetForId.put(id, ArrayUtils.removeElement(this.remainingAlphabetForId.get(id), hint));
             if (this.alphabet.length - this.amountHints == this.remainingAlphabetForId.get(id).length) {
@@ -226,7 +229,7 @@ public class Master extends AbstractLoggingActor {
                         id, this.hashedPasswords.remove(id),
                         passwordAlphabet, this.passwordLength);
 
-                if (!this.unassignedPasswords.isEmpty()) {
+                if (!this.workers.isEmpty()) {
                     ActorRef passwordWorker = this.workers.remove(this.workers.size() - 1);
                     passwordWorker.tell(unassignedPassword, this.self());
                 } else {
@@ -243,7 +246,7 @@ public class Master extends AbstractLoggingActor {
     protected void handle(PasswordResultMessage message) {
 		this.workers.add(this.sender());
 		if(Integer.toString(this.lastPasswordId + 1) == message.getId()){
-            this.collector.tell(new Collector.CollectMessage(message.getPw()));
+            this.collector.tell(new Collector.CollectMessage(message.getPw()), this.self());
             this.lastPasswordId++;
             if(!this.resultPasswords.isEmpty()){
                 this.checkToSendPasswords();
