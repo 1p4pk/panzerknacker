@@ -145,7 +145,7 @@ public class Master extends AbstractLoggingActor {
 			}
 
 			for(ActorRef worker : this.workers){
-				if(this.unassignedHintChars.size() > 0){
+				if(!this.unassignedHintChars.isEmpty()){
 					Worker.SetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 					worker.tell(workSetup, this.self());
 					this.charWorkers.put(worker, workSetup);
@@ -182,7 +182,7 @@ public class Master extends AbstractLoggingActor {
 				if (batchId < this.currentBatchId){
 					readNewBatch=false;
 					break;
-				};
+				}
 			}
 			if (readNewBatch) {this.reader.tell(new Reader.ReadMessage(), this.self());}
 		}
@@ -218,7 +218,7 @@ public class Master extends AbstractLoggingActor {
 
 	protected void handle(RegistrationMessage message) {
 		this.context().watch(this.sender());
-		if(this.unassignedHintChars.size() > 0){
+		if(!this.unassignedHintChars.isEmpty()){
 			Worker.SetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
@@ -226,13 +226,13 @@ public class Master extends AbstractLoggingActor {
 		} else {
 			this.workers.add(this.sender());
 		}
-		//		this.log().info("Registered {}", this.sender());
+		this.log().info("Registered {}", this.sender());
 	}
 	
 	protected void handle(Terminated message) {
 		this.context().unwatch(message.getActor());
 		this.workers.remove(message.getActor());
-//		this.log().info("Unregistered {}", message.getActor());
+		this.log().info("Unregistered {}", message.getActor());
 	}
 
 	protected Map<String, String> convertBatchToHintMap(){

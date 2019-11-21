@@ -2,10 +2,10 @@ package de.hpi.ddm.actors;
 
 import java.io.Serializable;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -137,18 +137,11 @@ public class Worker extends AbstractLoggingActor {
 	}
 
 	private void handle(HintDataMessage message) {
-		this.log().info("Start cracking hints.");
 		this.curentHints = message.getHintData();
 		char[] hintAlphabet = ArrayUtils.removeElement(this.alphabet, this.resultChar);
 		int hintLength = this.alphabet.length - 1;
 		List<String> possibleCleartextHints = new ArrayList<>();
 		this.heapPermutation(hintAlphabet, hintLength, possibleCleartextHints);
-		this.log().info("Finished heap permutation");
-//		this.log().info(String.valueOf(this.resultChar));
-//		this.log().info(possibleCleartextHints.get(0));
-//		this.log().info(this.hash(possibleCleartextHints.get(0)));
-//		this.log().info(possibleCleartextHints.get(1));
-//		this.log().info(possibleCleartextHints.get(2));
 
 		for(String cleartextHint: possibleCleartextHints) {
 			String hash = this.hash(cleartextHint);
@@ -163,7 +156,7 @@ public class Worker extends AbstractLoggingActor {
 	private String hash(String line) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			byte[] hashedBytes = digest.digest(String.valueOf(line).getBytes("UTF-8"));
+			byte[] hashedBytes = digest.digest(String.valueOf(line).getBytes(StandardCharsets.UTF_8));
 			
 			StringBuffer stringBuffer = new StringBuffer();
 			for (int i = 0; i < hashedBytes.length; i++) {
