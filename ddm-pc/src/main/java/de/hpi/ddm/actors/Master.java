@@ -164,7 +164,7 @@ public class Master extends AbstractLoggingActor {
 
 			for(ActorRef worker : this.workers){
 				if(!this.unassignedHintChars.isEmpty()){
-                    Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
+                    Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
 					worker.tell(workSetup, this.self());
 					this.charWorkers.put(worker, workSetup);
 				}
@@ -232,7 +232,7 @@ public class Master extends AbstractLoggingActor {
                         passwordAlphabet, this.passwordLength);
 
                 if (!this.workers.isEmpty()) {
-                    ActorRef passwordWorker = this.workers.remove(this.workers.size() - 1);
+                    ActorRef passwordWorker = this.workers.remove(0);
                     passwordWorker.tell(unassignedPassword, this.self());
                 } else {
                     // not enough workers at the moment
@@ -287,7 +287,7 @@ public class Master extends AbstractLoggingActor {
 	protected void handle(RegistrationMessage message) {
 		this.context().watch(this.sender());
 		if(!this.unassignedHintChars.isEmpty()){
-            Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
+            Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
 			this.charBatchMap.put(workSetup.getResultChar(), 0);

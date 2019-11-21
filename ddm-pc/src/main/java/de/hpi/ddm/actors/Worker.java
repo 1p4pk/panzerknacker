@@ -166,14 +166,15 @@ public class Worker extends AbstractLoggingActor {
 	private void handle(PasswordDataMessage message) {
 		this.log().info("Start cracking the password");
 		List<String> possibleCleartextPasswords = new ArrayList<>();
-		this.heapPermutation(message.getPasswordAlphabet(), message.getPasswordLength(), possibleCleartextPasswords);
-        this.log().info("Finished permutation generation");
+		this.genAllKLength(message.getPasswordAlphabet(), message.getPasswordLength(), possibleCleartextPasswords);
+		this.genAllKLength(new char[] {'E', 'F'}, 10, possibleCleartextPasswords);
+		this.log().info("Finished combination generation");
 
 		for(String cleartextPassword: possibleCleartextPasswords) {
 			String hash = this.hash(cleartextPassword);
 			if (hash.equals(message.getPasswordHash())){
 				this.sender().tell(new Master.PasswordResultMessage(message.getId(), cleartextPassword), this.self());
-				this.log().info(String.format("Cracked password no. {}: {}", message.getId(), cleartextPassword));
+				this.log().info(String.format("Cracked password no. %s: %s", message.getId(), cleartextPassword));
 			}
 		}
 	}
@@ -193,7 +194,29 @@ public class Worker extends AbstractLoggingActor {
 			throw new RuntimeException(e.getMessage());
 		}
 	}
-	
+
+
+
+	// Generating all possible strings of length k that can be formed from a set of n characters
+	// https://www.geeksforgeeks.org/print-all-combinations-of-given-length/
+	private void genAllKLength(char[] set, int k, List<String> l)
+	{
+		int n = set.length;
+		this.genAllKLengthRec(set, "", n, k, l);
+	}
+	private void genAllKLengthRec(char[] set, String prefix, int n, int k, List<String> l)
+	{
+		if (k == 0) {
+			l.add(new String(prefix));
+			return;
+		}
+
+		for (int i = 0; i < n; ++i) {
+			String newPrefix = prefix + set[i];
+			this.genAllKLengthRec(set, newPrefix, n, k - 1, l);
+		}
+	}
+
 	// Generating all permutations of an array using Heap's Algorithm
 	// https://en.wikipedia.org/wiki/Heap's_algorithm
 	// https://www.geeksforgeeks.org/heaps-algorithm-for-generating-permutations/
