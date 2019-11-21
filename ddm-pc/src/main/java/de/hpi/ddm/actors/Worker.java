@@ -167,6 +167,7 @@ public class Worker extends AbstractLoggingActor {
 		this.log().info("Start cracking the password");
 		List<String> possibleCleartextPasswords = new ArrayList<>();
 		this.heapPermutation(message.getPasswordAlphabet(), message.getPasswordLength(), possibleCleartextPasswords);
+        this.log().info("Finished permutation generation");
 
 		for(String cleartextPassword: possibleCleartextPasswords) {
 			String hash = this.hash(cleartextPassword);

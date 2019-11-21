@@ -158,6 +158,8 @@ public class Master extends AbstractLoggingActor {
 			this.amountHints = firstRow.length - 5;
 			for(char varChar : alphabet){
                 unassignedHintChars.add(new Worker.HintSetupMessage(varChar, this.alphabet, this.amountHints));
+				this.charBatchMap.put(varChar, 0);
+
 			}
 
 			for(ActorRef worker : this.workers){
@@ -165,7 +167,6 @@ public class Master extends AbstractLoggingActor {
                     Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
 					worker.tell(workSetup, this.self());
 					this.charWorkers.put(worker, workSetup);
-					this.charBatchMap.put(workSetup.getResultChar(), 0);
 				}
 			}
 		}
@@ -203,7 +204,7 @@ public class Master extends AbstractLoggingActor {
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
 			this.charBatchMap.put(currentChar, this.currentBatchId - 1);
-			this.unassignedHintChars.put(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
 		} else {
 			this.idleHintCrackers.add(this.sender());
 		}
