@@ -34,6 +34,8 @@ public class Master extends AbstractLoggingActor {
 		this.resultPasswords = new HashMap<>();
 		this.currentBatchId = 0;
 		this.lastPasswordId = 0;
+		this.passwordCounter = 0;
+		this.amountPassword = 0;
 		this.charBatchMap = new HashMap<>();
 	}
 
@@ -61,6 +63,11 @@ public class Master extends AbstractLoggingActor {
 	public static class PullDataMessage implements Serializable {
 		private static final long serialVersionUID = 3303382301659723997L;
 	}
+
+    @Data
+    public static class PullWorkMessage implements Serializable {
+        private static final long serialVersionUID = 330338230161294997L;
+    }
 
 	@Data @NoArgsConstructor @AllArgsConstructor
 	public static class HintResultMessage implements Serializable {
@@ -102,6 +109,9 @@ public class Master extends AbstractLoggingActor {
 	private int currentBatchId;
 	private Map<Character, Integer> charBatchMap;
 
+	private int passwordCounter;
+	private int amountPassword;
+
 	private Map<String, char[]> remainingAlphabetForId;
 	/////////////////////
 	// Actor Lifecycle //
@@ -124,6 +134,7 @@ public class Master extends AbstractLoggingActor {
 				.match(PullDataMessage.class, this::handle)
 				.match(HintResultMessage.class, this::handle)
                 .match(PasswordResultMessage.class, this::handle)
+                .match(PullWorkMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.match(RegistrationMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
@@ -145,8 +156,6 @@ public class Master extends AbstractLoggingActor {
 		///////////////////////////////////////////////////////////////////////////////////////////////////////
 		
 		if (message.getLines().isEmpty()) {
-			this.collector.tell(new Collector.PrintMessage(), this.self());
-//			this.terminate();
 			return;
 		}
 
@@ -196,7 +205,6 @@ public class Master extends AbstractLoggingActor {
 			this.charBatchMap.put(currentChar, this.currentBatchId);
 			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
 		} else if (!this.unassignedPasswords.isEmpty()) {
-			// TODO: remove first element not last (crack passwords in order)
 			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
 			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
 			this.charWorkers.remove(this.sender());
@@ -219,6 +227,19 @@ public class Master extends AbstractLoggingActor {
 		if (batchFinished) { this.reader.tell(new Reader.ReadMessage(), this.self()); }
 	}
 
+	protected void handle(PullWorkMessage message) {
+        if (!this.unassignedPasswords.isEmpty()) {
+            Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
+            this.sender().tell(unassignedPassword, this.self());
+            workers.remove(this.sender());
+        } else if (!this.unassignedHintChars.isEmpty()) {
+            Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
+            this.sender().tell(workSetup, this.self());
+            this.charWorkers.put(this.sender(), workSetup);
+            workers.remove(this.sender());
+        }
+    }
+
 	protected void handle(HintResultMessage message){
 		String id = message.getId();
 		char hint = message.getNonContainedChar();
@@ -230,6 +251,7 @@ public class Master extends AbstractLoggingActor {
                 Worker.PasswordDataMessage unassignedPassword = new Worker.PasswordDataMessage(
                         id, this.hashedPasswords.remove(id),
                         passwordAlphabet, this.passwordLength);
+
 
                 if (!this.workers.isEmpty()) {
                     ActorRef passwordWorker = this.workers.remove(0);
@@ -250,6 +272,10 @@ public class Master extends AbstractLoggingActor {
 		if(Integer.toString(this.lastPasswordId + 1) == message.getId()){
             this.collector.tell(new Collector.CollectMessage(message.getPw()), this.self());
             this.lastPasswordId++;
+            if(this.lastPasswordId == this.amountPassword){
+                this.collector.tell(new Collector.PrintMessage(), this.self());
+                this.terminate();
+            }
             if(!this.resultPasswords.isEmpty()){
                 this.checkToSendPasswords();
             }
@@ -263,6 +289,10 @@ public class Master extends AbstractLoggingActor {
         if(this.resultPasswords.containsKey(id)){
             this.collector.tell(new Collector.CollectMessage(this.resultPasswords.remove(id)), this.self());
             this.lastPasswordId++;
+            if(this.lastPasswordId == this.amountPassword){
+                this.collector.tell(new Collector.PrintMessage(), this.self());
+                this.terminate();
+            }
             if(!this.resultPasswords.isEmpty()){
                 this.checkToSendPasswords();
             }

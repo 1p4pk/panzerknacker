@@ -164,17 +164,15 @@ public class Worker extends AbstractLoggingActor {
 	}
 
 	private void handle(PasswordDataMessage message) {
-		this.log().info("Start cracking the password");
 		List<String> possibleCleartextPasswords = new ArrayList<>();
 		this.genAllKLength(message.getPasswordAlphabet(), message.getPasswordLength(), possibleCleartextPasswords);
-		this.genAllKLength(new char[] {'E', 'F'}, 10, possibleCleartextPasswords);
-		this.log().info("Finished combination generation");
-
 		for(String cleartextPassword: possibleCleartextPasswords) {
 			String hash = this.hash(cleartextPassword);
 			if (hash.equals(message.getPasswordHash())){
 				this.sender().tell(new Master.PasswordResultMessage(message.getId(), cleartextPassword), this.self());
 				this.log().info(String.format("Cracked password no. %s: %s", message.getId(), cleartextPassword));
+				this.sender().tell(new Master.PullWorkMessage(), this.self());
+				return;
 			}
 		}
 	}
