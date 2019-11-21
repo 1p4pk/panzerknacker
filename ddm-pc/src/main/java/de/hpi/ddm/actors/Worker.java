@@ -59,12 +59,11 @@ public class Worker extends AbstractLoggingActor {
 		private Map<String, String> hintData;
 	}
 
-	@Data
-	@NoArgsConstructor
-	@AllArgsConstructor
+	@Data @NoArgsConstructor @AllArgsConstructor
 	public static class PasswordDataMessage implements Serializable {
 		private static final long serialVersionUID = -50375819032223600L;
 		private String id;
+		private String passwordHash;
 		private char[] passwordAlphabet;
 		private int passwordLength;
 	}
@@ -109,6 +108,7 @@ public class Worker extends AbstractLoggingActor {
 				.match(MemberRemoved.class, this::handle)
 				.match(HintSetupMessage.class, this::handle)
 				.match(HintDataMessage.class, this::handle)
+				.match(PasswordDataMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -163,6 +163,20 @@ public class Worker extends AbstractLoggingActor {
 		}
 	}
 
+	private void handle(PasswordDataMessage message) {
+
+		List<String> possibleCleartextPasswords = new ArrayList<>();
+		this.heapPermutation(message.getPasswordAlphabet(), message.getPasswordLength(), possibleCleartextPasswords);
+
+		for(String cleartextPassword: possibleCleartextPasswords) {
+			String hash = this.hash(cleartextPassword);
+			if (hash.equals(message.getPasswordHash())){
+				this.sender().tell(new Master.PasswordResultMessage(message.getId(), cleartextPassword), this.self());
+				this.log().info(String.format("Cracked password no. {}: {}", message.getId(), cleartextPassword));
+			}
+		}
+	}
+
 	private String hash(String line) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -174,7 +188,7 @@ public class Worker extends AbstractLoggingActor {
 			}
 			return stringBuffer.toString();
 		}
-		catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+		catch (NoSuchAlgorithmException e) {
 			throw new RuntimeException(e.getMessage());
 		}
 	}
