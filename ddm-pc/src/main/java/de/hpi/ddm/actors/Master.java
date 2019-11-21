@@ -197,13 +197,14 @@ public class Master extends AbstractLoggingActor {
 			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
 		} else if (!this.unassignedPasswords.isEmpty()) {
 			// TODO: remove first element not last (crack passwords in order)
-			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(this.unassignedHintChars.size() - 1);
+			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.charWorkers.remove(this.sender());
 			this.sender().tell(unassignedPassword, this.self());
 		} else if (!this.unassignedHintChars.isEmpty()) {
-			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(this.unassignedHintChars.size() - 1);
+			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
 			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
-			this.charBatchMap.put(currentChar, this.currentBatchId - 1);
 			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
 		} else {
 			this.idleHintCrackers.add(this.sender());
