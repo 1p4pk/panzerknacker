@@ -4,6 +4,7 @@ import akka.actor.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.ArrayUtils;
 
 import java.io.Serializable;
 import java.util.*;
@@ -28,6 +29,7 @@ public class Master extends AbstractLoggingActor {
 		this.unassignedHintChars = new ArrayList<>();
 		this.idleHintCrackers = new ArrayList<>();
 		this.hintResults = new HashMap<>();
+		this.hashedPasswords = new HashMap<>();
 		this.currentBatchId = 0;
 		this.workerBatchMap = new HashMap<>();
 	}
@@ -89,7 +91,8 @@ public class Master extends AbstractLoggingActor {
 	private char[] alphabet;
 	private int amountHints;
 
-	private List<String[]> currentBatch;
+	private Map<String, String> hashedHints;
+	private Map<String, String> hashedPasswords;
 	private int currentBatchId;
 	private Map<ActorRef, Integer> workerBatchMap;
 
@@ -114,6 +117,7 @@ public class Master extends AbstractLoggingActor {
 				.match(BatchMessage.class, this::handle)
 				.match(PullDataMessage.class, this::handle)
 				.match(HintResultMessage.class, this::handle)
+                .match(PasswordResultMessage.class, this::handle)
 				.match(Terminated.class, this::handle)
 				.match(RegistrationMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
@@ -162,12 +166,17 @@ public class Master extends AbstractLoggingActor {
 		}
 
 		this.currentBatchId++;
-		this.currentBatch = message.getLines();
 
-		Map<String, String> hintMessageData = this.convertBatchToHintMap();
+		this.hashedHints = new HashMap<>();
+		for(String[] line : message.getLines()){
+			this.hashedPasswords.put(line[0], line[4]);
+			for(int i = 5; i < this.amountHints + 5; i++){
+				this.hashedHints.put(line[i], line[0]);
+			}
+		}
 
 		for(ActorRef charWorker : this.idleHintCrackers){
-			charWorker.tell(new Worker.HintDataMessage(hintMessageData), this.self());
+			charWorker.tell(new Worker.HintDataMessage(this.hashedHints), this.self());
 			this.workerBatchMap.put(charWorker, this.currentBatchId);
 		}
 		
@@ -176,7 +185,7 @@ public class Master extends AbstractLoggingActor {
 
 	protected void handle(PullDataMessage message) {
 		if(this.workerBatchMap.get(this.sender()) < this.currentBatchId){
-			Map<String, String> hintMessageData = this.convertBatchToHintMap();
+			Map<String, String> hintMessageData = this.hashedHints;
 			this.workerBatchMap.put(this.sender(), this.currentBatchId);
 			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
 		} else {
@@ -202,11 +211,18 @@ public class Master extends AbstractLoggingActor {
 			char[] charArray = this.hintResults.get(message.getId());
 			char[] updateArray = Arrays.copyOf(charArray, charArray.length+1);
 			updateArray[charArray.length] = message.getNonContainedChar();
-			this.hintResults.put(message.getId(), updateArray);
-            // TODO: Start cracking pw
             if (this.amountHints == updateArray.length) {
-                // TODO: Notify pw-cracker worker
-                // TODO: Delete hints from hint results
+                ActorRef passwordWorker = this.workers.remove(this.workers.size());
+                char[] passwordAlphabet = this.alphabet;
+                for(char hintChar : updateArray) passwordAlphabet = ArrayUtils.removeElement(passwordAlphabet, hintChar);
+                passwordWorker.tell(new Worker.PasswordDataMessage(message.getId(),
+						this.hashedPasswords.remove(message.getId()),
+                        passwordAlphabet,
+                        this.passwordLength
+                        ), this.self());
+                this.hintResults.remove(message.getId());
+            } else {
+                this.hintResults.put(message.getId(), updateArray);
             }
 		} else {
 			this.hintResults.put(message.getId(), new char[]{message.getNonContainedChar()});
@@ -214,7 +230,12 @@ public class Master extends AbstractLoggingActor {
 	}
 
     protected void handle(PasswordResultMessage message) {
+		this.workers.add(this.sender());
+		this.log().info("PasswordResultMessage");
+		this.log().info(message.getPw());
         // TODO: Receive cracked pw
+		// TODO: Create data structure for cracked passwords
+		// TODO: Send sorted passwords to collector
     }
 
 	protected void terminate() {
@@ -249,15 +270,5 @@ public class Master extends AbstractLoggingActor {
 		this.context().unwatch(message.getActor());
 		this.workers.remove(message.getActor());
 		this.log().info("Unregistered {}", message.getActor());
-	}
-
-	protected Map<String, String> convertBatchToHintMap(){
-		Map<String, String> hintMessageData = new HashMap<>();
-		for(String[] line : this.currentBatch){
-			for(int i = 5; i < this.amountHints + 5; i++){
-				hintMessageData.put(line[i], line[0]);
-			}
-		}
-		return hintMessageData;
 	}
 }
