@@ -69,7 +69,7 @@ public class Worker extends AbstractLoggingActor {
 	private char resultChar;
 	private char[] alphabet;
 	private int amountHints;
-	private HashMap<String, String> curentHints;
+	private Map<String, String> curentHints;
 
 	/////////////////////
 	// Actor Lifecycle //
@@ -137,7 +137,7 @@ public class Worker extends AbstractLoggingActor {
 	}
 
 	private void handle(HintDataMessage message) {
-		// Todo update currenthints
+		this.curentHints = message.getHintData();
 		char[] hintAlphabet = ArrayUtils.removeElement(this.alphabet, this.resultChar);
 		int hintLength = this.alphabet.length - 1;
 		List<String> possibleCleartextHints = new ArrayList<>();

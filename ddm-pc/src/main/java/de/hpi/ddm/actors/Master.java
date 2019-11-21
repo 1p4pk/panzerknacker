@@ -153,7 +153,7 @@ public class Master extends AbstractLoggingActor {
 
 		Map<String, String> hintMessageData = new HashMap<>();
 		for(String[] line : this.currentBatch){
-			for(i=5;i<this.amountHints+5;i++){
+			for(int i = 5; i < this.amountHints + 5; i++){
 				hintMessageData.put(line[i], line[0]);
 			}
 		}
