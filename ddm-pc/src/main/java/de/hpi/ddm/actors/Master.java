@@ -92,7 +92,7 @@ public class Master extends AbstractLoggingActor {
 	private final List<ActorRef> idleHintCrackers;
     private final List<Worker.HintSetupMessage> unassignedHintChars;
     private final List<Worker.PasswordDataMessage> unassignedPasswords;
-
+	private Map<Character, Integer> charBatchMap;
 
 	private long startTime;
 
@@ -106,7 +106,7 @@ public class Master extends AbstractLoggingActor {
 	private Map<String, String> resultPasswords;
 	private int lastPasswordId;
 	private int currentBatchId;
-	private Map<Character, Integer> charBatchMap;
+
 
 	private int amountPassword;
 
@@ -173,6 +173,7 @@ public class Master extends AbstractLoggingActor {
 				if(!this.unassignedHintChars.isEmpty()){
                     Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
 					worker.tell(workSetup, this.self());
+					this.workers.remove(worker);
 					this.charWorkers.put(worker, workSetup);
 				}
 			}
@@ -214,7 +215,8 @@ public class Master extends AbstractLoggingActor {
 			// Map worker to pw
 			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
 			this.sender().tell(unassignedPassword, this.self());
-		} else if (!this.unassignedHintChars.isEmpty()) { // Elif look for characters that are unassigned
+		} else if (!this.unassignedHintChars.isEmpty() && this.charBatchMap.containsValue(this.currentBatchId - 1)) {
+			// Elif look for characters that are unassigned and check if BatchMap still has the previous batchId
 			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
 			this.charWorkers.put(this.sender(), workSetup);
 			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
