@@ -34,7 +34,6 @@ public class Master extends AbstractLoggingActor {
 		this.resultPasswords = new HashMap<>();
 		this.currentBatchId = 0;
 		this.lastPasswordId = 0;
-		this.passwordCounter = 0;
 		this.amountPassword = 0;
 		this.charBatchMap = new HashMap<>();
 	}
@@ -90,8 +89,8 @@ public class Master extends AbstractLoggingActor {
 	private final ActorRef collector;
 	private final List<ActorRef> workers;
     private final Map<ActorRef, Worker.HintSetupMessage> charWorkers;
-    private final List<Worker.HintSetupMessage> unassignedHintChars;
 	private final List<ActorRef> idleHintCrackers;
+    private final List<Worker.HintSetupMessage> unassignedHintChars;
     private final List<Worker.PasswordDataMessage> unassignedPasswords;
 
 
@@ -109,7 +108,6 @@ public class Master extends AbstractLoggingActor {
 	private int currentBatchId;
 	private Map<Character, Integer> charBatchMap;
 
-	private int passwordCounter;
 	private int amountPassword;
 
 	private Map<String, char[]> remainingAlphabetForId;
@@ -182,6 +180,7 @@ public class Master extends AbstractLoggingActor {
 
 		this.currentBatchId++;
 
+		// Save hints in HashMap with key on hashed hint and id as value.
 		this.hashedHints = new HashMap<>();
 		for(String[] line : message.getLines()){
 			this.hashedPasswords.put(line[0], line[4]);
@@ -190,8 +189,10 @@ public class Master extends AbstractLoggingActor {
 			}
 		}
 
+		// Inform idle workers that have pulled data but had to wait for others to finish the batch for a certain char.
 		for(ActorRef charWorker : this.idleHintCrackers){
 			charWorker.tell(new Worker.HintDataMessage(this.hashedHints), this.self());
+			// Update batchId for the specific character.
 			this.charBatchMap.put(this.charWorkers.get(charWorker).getResultChar(), this.currentBatchId);
 		}
 		
@@ -199,21 +200,25 @@ public class Master extends AbstractLoggingActor {
 	}
 
 	protected void handle(PullDataMessage message) {
+		// Get character of current charWorker.
 		char currentChar = this.charWorkers.get(this.sender()).getResultChar();
+		// If current hints for the character have not been cracked, crack hints.
 		if (this.charBatchMap.get(currentChar) < this.currentBatchId) {
-			Map<String, String> hintMessageData = this.hashedHints;
+			// Update batchId for character.
 			this.charBatchMap.put(currentChar, this.currentBatchId);
-			this.sender().tell(new Worker.HintDataMessage(hintMessageData), this.self());
-		} else if (!this.unassignedPasswords.isEmpty()) {
-			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
-			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.sender().tell(new Worker.HintDataMessage(this.hashedHints), this.self());
+		} else if (!this.unassignedPasswords.isEmpty()) { // Elif look for passwords that can be cracked
+			// Clean up mapping of worker to character
 			this.charWorkers.remove(this.sender());
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			// Map worker to pw
+			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
 			this.sender().tell(unassignedPassword, this.self());
-		} else if (!this.unassignedHintChars.isEmpty()) {
+		} else if (!this.unassignedHintChars.isEmpty()) { // Elif look for characters that are unassigned
 			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
-			this.sender().tell(workSetup, this.self());
 			this.charWorkers.put(this.sender(), workSetup);
 			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.sender().tell(workSetup, this.self());
 		} else {
 			this.idleHintCrackers.add(this.sender());
 		}
@@ -230,13 +235,13 @@ public class Master extends AbstractLoggingActor {
 	protected void handle(PullWorkMessage message) {
         if (!this.unassignedPasswords.isEmpty()) {
             Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
-            this.sender().tell(unassignedPassword, this.self());
             workers.remove(this.sender());
+			this.sender().tell(unassignedPassword, this.self());
         } else if (!this.unassignedHintChars.isEmpty()) {
             Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
-            this.sender().tell(workSetup, this.self());
             this.charWorkers.put(this.sender(), workSetup);
             workers.remove(this.sender());
+			this.sender().tell(workSetup, this.self());
         }
     }
 
@@ -249,9 +254,7 @@ public class Master extends AbstractLoggingActor {
                 char[] passwordAlphabet = this.remainingAlphabetForId.remove(id);
 
                 Worker.PasswordDataMessage unassignedPassword = new Worker.PasswordDataMessage(
-                        id, this.hashedPasswords.remove(id),
-                        passwordAlphabet, this.passwordLength);
-
+                        id, this.hashedPasswords.remove(id), passwordAlphabet, this.passwordLength);
 
                 if (!this.workers.isEmpty()) {
                     ActorRef passwordWorker = this.workers.remove(0);
@@ -260,7 +263,6 @@ public class Master extends AbstractLoggingActor {
                     // not enough workers at the moment
                     this.unassignedPasswords.add(unassignedPassword);
                 }
-
             }
 		} else {
 			this.remainingAlphabetForId.put(id, ArrayUtils.removeElement(this.alphabet, hint));
