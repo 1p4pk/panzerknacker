@@ -157,7 +157,6 @@ public class Worker extends AbstractLoggingActor {
 			if (curentHints.containsKey(hash)){
 				String passwordId = curentHints.get(hash);
 				this.sender().tell(new Master.HintResultMessage(passwordId, resultChar), this.self());
-				this.log().info("Cracked a hint for char " + resultChar);
 			}
 		}
 		this.sender().tell(new Master.PullDataMessage(), this.self());
@@ -170,7 +169,6 @@ public class Worker extends AbstractLoggingActor {
 			String hash = this.hash(cleartextPassword);
 			if (hash.equals(message.getPasswordHash())){
 				this.sender().tell(new Master.PasswordResultMessage(message.getId(), cleartextPassword), this.self());
-				this.log().info(String.format("Cracked password no. %s: %s", message.getId(), cleartextPassword));
 				this.sender().tell(new Master.PullWorkMessage(), this.self());
 				return;
 			}
