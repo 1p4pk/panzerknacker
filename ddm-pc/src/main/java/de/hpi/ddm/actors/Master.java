@@ -313,6 +313,16 @@ public class Master extends AbstractLoggingActor {
 			this.context().unwatch(worker);
 			worker.tell(PoisonPill.getInstance(), ActorRef.noSender());
 		}
+
+        for (ActorRef worker : this.charWorkers.keySet()) {
+            this.context().unwatch(worker);
+            worker.tell(PoisonPill.getInstance(), ActorRef.noSender());
+        }
+
+        for (ActorRef worker : this.idleHintCrackers) {
+            this.context().unwatch(worker);
+            worker.tell(PoisonPill.getInstance(), ActorRef.noSender());
+        }
 		
 		this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
 		
