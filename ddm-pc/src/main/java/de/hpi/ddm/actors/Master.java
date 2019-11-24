@@ -163,7 +163,7 @@ public class Master extends AbstractLoggingActor {
 			this.passwordLength = Integer.parseInt(firstRow[3]);
 			this.alphabet = firstRow[2].toCharArray();
 			this.amountHints = firstRow.length - 5;
-			for(char varChar : alphabet){
+			for(char varChar : this.alphabet){
                 unassignedHintChars.add(new Worker.HintSetupMessage(varChar, this.alphabet, this.amountHints));
 				this.charBatchMap.put(varChar, 0);
 
@@ -186,8 +186,8 @@ public class Master extends AbstractLoggingActor {
 		this.hashedHints = new HashMap<>();
 		for(String[] line : message.getLines()){
 			this.amountPassword++;
-			this.hashedPasswords.put(line[0], line[4]);
-			for(int i = 5; i < this.amountHints + 5; i++){
+			this.hashedPasswords.put(line[0], line[4]); // <id, passwordHash>
+			for(int i = 5; i < this.amountHints + 5; i++){ // flexible number of hints
 				this.hashedHints.put(line[i], line[0]);
 			}
 		}
@@ -198,7 +198,7 @@ public class Master extends AbstractLoggingActor {
 		    this.charBatchMap.put(this.charWorkers.get(charWorker).getResultChar(), this.currentBatchId);
 		    charWorker.tell(new Worker.HintDataMessage(this.hashedHints), this.self());
 		}
-		
+		this.idleHintCrackers.clear(); // There should be no idle workers anymore
 		this.collector.tell(new Collector.CollectMessage("Processed batch of size " + message.getLines().size()), this.self());
 	}
 
@@ -346,8 +346,16 @@ public class Master extends AbstractLoggingActor {
 	}
 	
 	protected void handle(Terminated message) {
-		this.context().unwatch(message.getActor());
-		this.workers.remove(message.getActor());
-		this.log().info("Unregistered {}", message.getActor());
+		if (this.workers.contains(this.sender())) {
+			this.workers.remove(this.sender());
+		} else if (this.charWorkers.containsKey(this.sender())) {
+			char currentChar = this.charWorkers.get(this.sender()).getResultChar();
+			this.charWorkers.remove(this.sender());
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+		} else {
+			this.idleHintCrackers.remove(this.sender());
+		}
+		this.context().unwatch(this.sender());
+		this.log().info("Unregistered {}", this.sender());
 	}
 }
