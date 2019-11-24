@@ -1,10 +1,5 @@
 package de.hpi.ddm.actors;
 
-import java.io.UnsupportedEncodingException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.List;
-
 import akka.actor.AbstractLoggingActor;
 import akka.actor.ActorRef;
 import akka.actor.PoisonPill;
@@ -16,6 +11,18 @@ import akka.cluster.ClusterEvent.MemberUp;
 import akka.cluster.Member;
 import akka.cluster.MemberStatus;
 import de.hpi.ddm.MasterSystem;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.ArrayUtils;
+
+import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 public class Worker extends AbstractLoggingActor {
 
@@ -37,13 +44,39 @@ public class Worker extends AbstractLoggingActor {
 	// Actor Messages //
 	////////////////////
 
+	@Data @NoArgsConstructor @AllArgsConstructor
+	public static class HintSetupMessage implements Serializable {
+		private static final long serialVersionUID = -50375816448627600L;
+		private char resultChar;
+		private char[] alphabet;
+	}
+
+	@Data @NoArgsConstructor @AllArgsConstructor
+	public static class HintDataMessage implements Serializable {
+		private static final long serialVersionUID = -50375816444623600L;
+		private Map<String, String> hintData;
+	}
+
+	@Data @NoArgsConstructor @AllArgsConstructor
+	public static class PasswordDataMessage implements Serializable {
+		private static final long serialVersionUID = -50375819032223600L;
+		private String id;
+		private String passwordHash;
+		private char[] passwordAlphabet;
+		private int passwordLength;
+	}
 	/////////////////
 	// Actor State //
 	/////////////////
 
 	private Member masterSystem;
 	private final Cluster cluster;
-	
+
+	// Hint variables
+	private char resultChar;
+	private char[] alphabet;
+	private Map<String, String> curentHints;
+
 	/////////////////////
 	// Actor Lifecycle //
 	/////////////////////
@@ -70,6 +103,9 @@ public class Worker extends AbstractLoggingActor {
 				.match(CurrentClusterState.class, this::handle)
 				.match(MemberUp.class, this::handle)
 				.match(MemberRemoved.class, this::handle)
+				.match(HintSetupMessage.class, this::handle)
+				.match(HintDataMessage.class, this::handle)
+				.match(PasswordDataMessage.class, this::handle)
 				.matchAny(object -> this.log().info("Received unknown message: \"{}\"", object.toString()))
 				.build();
 	}
@@ -99,11 +135,47 @@ public class Worker extends AbstractLoggingActor {
 		if (this.masterSystem.equals(message.member()))
 			this.self().tell(PoisonPill.getInstance(), ActorRef.noSender());
 	}
-	
+
+	private void handle(HintSetupMessage message) {
+		this.resultChar = message.getResultChar();
+		this.alphabet = message.getAlphabet();
+		this.sender().tell(new Master.PullDataMessage(), this.self());
+	}
+
+	private void handle(HintDataMessage message) {
+		this.curentHints = message.getHintData();
+		char[] hintAlphabet = ArrayUtils.removeElement(this.alphabet, this.resultChar);
+		int hintLength = this.alphabet.length - 1;
+		List<String> possibleCleartextHints = new ArrayList<>();
+		this.heapPermutation(hintAlphabet, hintLength, possibleCleartextHints);
+
+		for(String cleartextHint: possibleCleartextHints) {
+			String hash = this.hash(cleartextHint);
+			if (curentHints.containsKey(hash)){
+				String passwordId = curentHints.get(hash);
+				this.sender().tell(new Master.HintResultMessage(passwordId, resultChar), this.self());
+			}
+		}
+		this.sender().tell(new Master.PullDataMessage(), this.self());
+	}
+
+	private void handle(PasswordDataMessage message) {
+		List<String> possibleCleartextPasswords = new ArrayList<>();
+		this.genAllKLength(message.getPasswordAlphabet(), message.getPasswordLength(), possibleCleartextPasswords);
+		for(String cleartextPassword: possibleCleartextPasswords) {
+			String hash = this.hash(cleartextPassword);
+			if (hash.equals(message.getPasswordHash())){
+				this.sender().tell(new Master.PasswordResultMessage(message.getId(), cleartextPassword), this.self());
+				this.sender().tell(new Master.PullWorkMessage(), this.self());
+				return;
+			}
+		}
+	}
+
 	private String hash(String line) {
 		try {
 			MessageDigest digest = MessageDigest.getInstance("SHA-256");
-			byte[] hashedBytes = digest.digest(String.valueOf(line).getBytes("UTF-8"));
+			byte[] hashedBytes = digest.digest(String.valueOf(line).getBytes(StandardCharsets.UTF_8));
 			
 			StringBuffer stringBuffer = new StringBuffer();
 			for (int i = 0; i < hashedBytes.length; i++) {
@@ -111,21 +183,43 @@ public class Worker extends AbstractLoggingActor {
 			}
 			return stringBuffer.toString();
 		}
-		catch (NoSuchAlgorithmException | UnsupportedEncodingException e) {
+		catch (NoSuchAlgorithmException e) {
 			throw new RuntimeException(e.getMessage());
 		}
 	}
-	
+
+
+
+	// Generating all possible strings of length k that can be formed from a set of n characters
+	// https://www.geeksforgeeks.org/print-all-combinations-of-given-length/
+	private void genAllKLength(char[] set, int k, List<String> l)
+	{
+		int n = set.length;
+		this.genAllKLengthRec(set, "", n, k, l);
+	}
+	private void genAllKLengthRec(char[] set, String prefix, int n, int k, List<String> l)
+	{
+		if (k == 0) {
+			l.add(new String(prefix));
+			return;
+		}
+
+		for (int i = 0; i < n; ++i) {
+			String newPrefix = prefix + set[i];
+			this.genAllKLengthRec(set, newPrefix, n, k - 1, l);
+		}
+	}
+
 	// Generating all permutations of an array using Heap's Algorithm
 	// https://en.wikipedia.org/wiki/Heap's_algorithm
 	// https://www.geeksforgeeks.org/heaps-algorithm-for-generating-permutations/
-	private void heapPermutation(char[] a, int size, int n, List<String> l) {
+	private void heapPermutation(char[] a, int size, List<String> l) {
 		// If size is 1, store the obtained permutation
 		if (size == 1)
 			l.add(new String(a));
 
 		for (int i = 0; i < size; i++) {
-			heapPermutation(a, size - 1, n, l);
+			heapPermutation(a, size - 1, l);
 
 			// If size is odd, swap first and last element
 			if (size % 2 == 1) {

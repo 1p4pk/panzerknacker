@@ -1,2 +1,2 @@
-# panzerknacker
-DDM Assignment Jonathan Schneider und Leon Papke
+# Team panzerknacker
+DDM Assignment by Jonathan Schneider and Leon Papke
