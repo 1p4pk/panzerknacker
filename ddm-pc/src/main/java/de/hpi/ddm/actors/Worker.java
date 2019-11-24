@@ -49,7 +49,6 @@ public class Worker extends AbstractLoggingActor {
 		private static final long serialVersionUID = -50375816448627600L;
 		private char resultChar;
 		private char[] alphabet;
-		private int amountHints;
 	}
 
 	@Data @NoArgsConstructor @AllArgsConstructor
@@ -76,7 +75,6 @@ public class Worker extends AbstractLoggingActor {
 	// Hint variables
 	private char resultChar;
 	private char[] alphabet;
-	private int amountHints;
 	private Map<String, String> curentHints;
 
 	/////////////////////
@@ -141,7 +139,6 @@ public class Worker extends AbstractLoggingActor {
 	private void handle(HintSetupMessage message) {
 		this.resultChar = message.getResultChar();
 		this.alphabet = message.getAlphabet();
-		this.amountHints = message.getAmountHints();
 		this.sender().tell(new Master.PullDataMessage(), this.self());
 	}
 

@@ -164,7 +164,7 @@ public class Master extends AbstractLoggingActor {
 			this.alphabet = firstRow[2].toCharArray();
 			this.amountHints = firstRow.length - 5;
 			for(char varChar : this.alphabet){
-                unassignedHintChars.add(new Worker.HintSetupMessage(varChar, this.alphabet, this.amountHints));
+                unassignedHintChars.add(new Worker.HintSetupMessage(varChar, this.alphabet));
 				this.charBatchMap.put(varChar, 0);
 
 			}
@@ -213,7 +213,7 @@ public class Master extends AbstractLoggingActor {
 		} else if (!this.unassignedPasswords.isEmpty()) { // Elif look for passwords that can be cracked
 			// Clean up mapping of worker to character
 			this.charWorkers.remove(this.sender());
-			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet));
 			// Map worker to pw
 			Worker.PasswordDataMessage unassignedPassword = this.unassignedPasswords.remove(0);
 			this.sender().tell(unassignedPassword, this.self());
@@ -221,7 +221,7 @@ public class Master extends AbstractLoggingActor {
 			// Elif look for characters that are unassigned and check if BatchMap still has the previous batchId
 			Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
 			this.charWorkers.put(this.sender(), workSetup);
-			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet));
 			this.sender().tell(workSetup, this.self());
 		} else {
 			this.idleHintCrackers.add(this.sender());
@@ -351,7 +351,7 @@ public class Master extends AbstractLoggingActor {
 		} else if (this.charWorkers.containsKey(this.sender())) {
 			char currentChar = this.charWorkers.get(this.sender()).getResultChar();
 			this.charWorkers.remove(this.sender());
-			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet, this.amountHints));
+			this.unassignedHintChars.add(new Worker.HintSetupMessage(currentChar, this.alphabet));
 		} else {
 			this.idleHintCrackers.remove(this.sender());
 		}
