@@ -169,12 +169,14 @@ public class Master extends AbstractLoggingActor {
 
 			}
 
-			for(ActorRef worker : this.workers){
-				if(!this.unassignedHintChars.isEmpty()){
-                    Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
-                    this.workers.remove(worker);
-                    this.charWorkers.put(worker, workSetup);
-                    worker.tell(workSetup, this.self());
+			ListIterator<ActorRef> workersIter = this.workers.listIterator();
+			while (workersIter.hasNext()) {
+				ActorRef worker = workersIter.next();
+				if(!this.unassignedHintChars.isEmpty()) {
+					Worker.HintSetupMessage workSetup = this.unassignedHintChars.remove(0);
+					workersIter.remove();
+					this.charWorkers.put(worker, workSetup);
+					worker.tell(workSetup, this.self());
 				}
 			}
 		}
