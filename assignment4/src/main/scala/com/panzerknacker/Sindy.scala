@@ -1,6 +1,7 @@
 package com.panzerknacker
 
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.collect_set
 
 object Sindy {
 
@@ -17,7 +18,10 @@ object Sindy {
         .option("inferSchema", "true")
         .option("header", "true")
         .csv(_)
-        .flatMap(tuple => tuple.schema.fieldNames.map(column => (column, tuple.getAs(column).toString)))
+        .flatMap(tuple => tuple.schema.fieldNames.map(column => (tuple.getAs(column).toString, column)))
     ).reduce(_.union(_))
+
+    val preaggregation = cells.groupBy($"_1").agg(collect_set($"_2"))
+
   }
 }
