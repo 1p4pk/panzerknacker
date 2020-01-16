@@ -44,8 +44,8 @@ object Main extends App {
     val cores = 4
 
     // Set the default number of shuffle partitions (default is 200, which is too high for local deployment)
-    spark.conf.set("spark.sql.shuffle.partitions", "8") //
-
+    spark.conf.set("spark.sql.shuffle.partitions", cores * 2)
+    spark.conf.set("spark.executor.cores", cores)
     // Importing implicit encoders for standard library classes and tuples that are used as Dataset types
 
     println("---------------------------------------------------------------------------------------------------------")

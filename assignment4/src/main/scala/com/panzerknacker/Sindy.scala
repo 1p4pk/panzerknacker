@@ -20,10 +20,12 @@ object Sindy {
         .csv(_)
         .flatMap(tuple => tuple.schema.fieldNames.map(column => (tuple.getAs(column).toString, column)))
     ).reduce(_.union(_))
-    val preaggregation = cells.groupBy($"_1").agg(collect_set($"_2").as("_2"))
-    val attributeSets = preaggregation.select("_2")
-    val inclusionList = attributeSets.flatMap(row => row.getSeq[String](0).map(column => (column, row.getSeq[String](0).filter(_ != column).toArray.toSet)))
-    val aggregate = inclusionList.rdd.reduceByKey((acc, n) => acc.intersect(n)).filter(_._2.size > 0)
-    aggregate.collect().sortBy(_._1).map(row => println(row._1 + " < " + row._2.mkString(", ")))
+      .groupBy($"_1").agg(collect_set($"_2").as("_2"))
+      .select("_2")
+      .flatMap(tuple => tuple.getSeq[String](0).map(
+        column => (column, tuple.getSeq[String](0).filter(_ != column).toArray.toSet))
+      )
+      .rdd.reduceByKey((agg, i) => agg.intersect(i)).filter(_._2.size > 0)
+      .collect().sortBy(_._1).map(tuple => println(tuple._1 + " < " + tuple._2.mkString(", ")))
   }
 }
