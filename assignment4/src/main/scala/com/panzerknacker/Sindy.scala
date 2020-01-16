@@ -29,11 +29,15 @@ object Sindy {
     println("---------------------------------------------------------------------------------------------------------")
     val attributeSets = preaggregation.select("_2")
     println("---------------------------------------------------------------------------------------------------------")
-    println(attributeSets.show())
+    attributeSets.show()
     println("---------------------------------------------------------------------------------------------------------")
-    val inclusionList = attributeSets.flatMap(row => row.getSeq[String](0).map(column => (column, row.getSeq[String](0).filter(_ != column))))
+    val inclusionList = attributeSets.flatMap(row => row.getSeq[String](0).map(column => (column, row.getSeq[String](0).filter(_ != column).toArray.toSet)))
     println("---------------------------------------------------------------------------------------------------------")
-    println(inclusionList.show(50))
+    inclusionList.show()
+    println("---------------------------------------------------------------------------------------------------------")
+    val aggregate = inclusionList.rdd.reduceByKey((acc, n) => acc.intersect(n)).toDF("_1", "_2")
+    println("---------------------------------------------------------------------------------------------------------")
+    aggregate.show(50, false)
     println("---------------------------------------------------------------------------------------------------------")
   }
 }
