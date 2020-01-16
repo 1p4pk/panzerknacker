@@ -13,18 +13,6 @@ object Main extends App {
 
     println("---------------------------------------------------------------------------------------------------------")
 
-    //------------------------------------------------------------------------------------------------------------------
-    // Setting up a Spark Session
-    //------------------------------------------------------------------------------------------------------------------
-
-    // Create a SparkSession to work with Spark
-    val sparkSession = SparkSession
-      .builder()
-      .appName("ind")
-      .master("local[4]") // local, with 4 worker cores
-
-    val spark = sparkSession.getOrCreate()
-
     // Read command-line arguments
     type ArgsMap = Map[Symbol, Any]
 
@@ -44,6 +32,17 @@ object Main extends App {
     val cores = if(argsList.contains('cores)) argsList('cores) else 4
     val partitions = if(argsList.contains('partitions)) argsList('partitions) else 8
 
+    //------------------------------------------------------------------------------------------------------------------
+    // Setting up a Spark Session
+    //------------------------------------------------------------------------------------------------------------------
+
+    // Create a SparkSession to work with Spark
+    val sparkSession = SparkSession
+      .builder()
+      .appName("ind")
+      .master(s"local[$cores]") // local, with 4 worker cores
+
+    val spark = sparkSession.getOrCreate()
     // Set the default number of shuffle partitions (default is 200, which is too high for local deployment)
     spark.conf.set("spark.sql.shuffle.partitions", partitions.toString)
     spark.conf.set("spark.executor.cores", cores.toString)

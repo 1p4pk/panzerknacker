@@ -10,7 +10,7 @@ object Sindy {
     // Importing implicit encoders for standard library classes and tuples that are used as Dataset types
     import spark.implicits._
 
-    val cells = inputs.map(
+    inputs.map(
       spark
         .read
         .option("sep", ";")
