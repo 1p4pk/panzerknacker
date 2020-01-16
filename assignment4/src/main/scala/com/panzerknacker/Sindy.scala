@@ -7,7 +7,6 @@ object Sindy {
 
   def discoverINDs(inputs: List[String], spark: SparkSession): Unit = {
 
-
     // Importing implicit encoders for standard library classes and tuples that are used as Dataset types
     import spark.implicits._
 

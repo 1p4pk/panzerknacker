@@ -31,8 +31,8 @@ object Main extends App {
     def getArgs(argsMap: ArgsMap, list: List[String]) : ArgsMap = {
       list match {
         case Nil => argsMap
-        case "--path" :: value :: tail => getArgs(argsMap ++ Map('path -> value), tail)
-        case "--cores" :: value :: tail => getArgs(argsMap ++ Map('cores -> value.toInt), tail)
+        case "--path" :: value :: tail => getArgs(argsMap ++ Map('path -> value.toString), tail)
+        case "--cores" :: value :: tail => getArgs(argsMap ++ Map('cores -> value.toInt) ++ Map('partitions-> value.toInt * 2), tail)
         case option :: tail =>
           println("Unkown option " + option)
           sys.exit(1)
@@ -40,12 +40,13 @@ object Main extends App {
     }
 
     val argsList = getArgs(Map(), args.toList)
-    val path = "TPCH"
-    val cores = 4
+    val path = if(argsList.contains('path)) argsList('path) else "./TPCH"
+    val cores = if(argsList.contains('cores)) argsList('cores) else 4
+    val partitions = if(argsList.contains('partitions)) argsList('partitions) else 8
 
     // Set the default number of shuffle partitions (default is 200, which is too high for local deployment)
-    spark.conf.set("spark.sql.shuffle.partitions", cores * 2)
-    spark.conf.set("spark.executor.cores", cores)
+    spark.conf.set("spark.sql.shuffle.partitions", partitions.toString)
+    spark.conf.set("spark.executor.cores", cores.toString)
     // Importing implicit encoders for standard library classes and tuples that are used as Dataset types
 
     println("---------------------------------------------------------------------------------------------------------")
