@@ -61,7 +61,7 @@ object Main extends App {
     // Inclusion Dependency Discovery (Homework)
     //------------------------------------------------------------------------------------------------------------------
 
-    val inputs = List("region", "nation") // , "supplier", "customer", "part", "lineitem", "orders")
+    val inputs = List("region", "nation", "supplier", "customer", "part", "lineitem", "orders")
       .map(name => s"$path/tpch_$name.csv")
 
     time {
