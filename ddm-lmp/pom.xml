@@ -13,7 +13,7 @@
 		<scala.version>2.12</scala.version>
 		<akka.version>2.6.0</akka.version>
 		<chill-akka.version>0.9.3</chill-akka.version>
-		<logback.version>1.2.3</logback.version>
+		<logback.version>1.2.9</logback.version>
 		<jcommander.version>1.72</jcommander.version>
 		<lombok.version>1.18.2</lombok.version>
 		<mockito-all.version>1.9.5</mockito-all.version>
